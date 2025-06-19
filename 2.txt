@@ -1,0 +1,31 @@
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+
+try:
+    print("📁 Reading client.key...")
+    with open("client.key", "rb") as key_file:
+        encrypted_key = key_file.read()
+    print("✅ Key file read successfully")
+
+    print("🔐 Attempting to decrypt with password...")
+    password = b"optimus"  # Replace with your actual password
+    private_key = serialization.load_pem_private_key(
+        encrypted_key,
+        password=password,
+        backend=default_backend()
+    )
+    print("✅ Decryption successful")
+
+    print("💾 Writing decrypted key to decrypted.key...")
+    with open("decrypted.key", "wb") as out_file:
+        out_file.write(
+            private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+        )
+    print("🎉 Decrypted key saved to decrypted.key")
+
+except Exception as e:
+    print("❌ Error:", e)
