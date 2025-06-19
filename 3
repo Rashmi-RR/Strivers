@@ -1,24 +1,27 @@
- import requests
+import requests
 import json
-import ssl
-import urllib3
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 
-# ✅ Suppress InsecureRequestWarning if verify=False is used
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# === CONFIGURATION ===
 
-# 🔗 Dynatrace API endpoint URL
-dynatrace_url = "https://api-platform-mtls.cib.echonet/it_prod-dynatrace-configuration/v1/managementZones"
+# Path to your password-protected key and cert
+ENCRYPTED_KEY_PATH = "client.key"
+CERT_PATH = "client.crt"
 
-# 🔐 Replace this with your actual access token
-access_token = "YOUR_ACCESS_TOKEN_HERE"
+# Output path for the decrypted key
+DECRYPTED_KEY_PATH = "decrypted.key"
 
-# 📋 Define the headers with access token
-headers = {
-    "Authorization": f"Api-Token {access_token}",
-    "Content-Type": "application/json"
-}
+# Your key password (type exactly as provided)
+KEY_PASSWORD = b"optimus"  # Replace with your actual password (in bytes)
 
-# 🔍 Define the query parameters
+# Dynatrace API token
+API_TOKEN = "your_dynatrace_api_token_here"  # Replace with your token
+
+# Dynatrace API endpoint
+URL = "https://api-platform-mtls.cib.echonet/it_prod-dynatrace-configuration/v1/managementZones"
+
+# Query parameters
 params = {
     "problemSelector": 'status("OPEN") AND severityLevel("RESOURCE_CONTENTION")',
     "entitySelector": 'type("HOST")',
@@ -27,37 +30,65 @@ params = {
     "pageSize": 10
 }
 
-# 🔒 If you want to use custom SSL (optional for advanced config)
-# context = ssl.create_default_context()
-# context.check_hostname = False
-# context.verify_mode = ssl.CERT_NONE
+# Request headers
+headers = {
+    "Authorization": f"Api-Token {API_TOKEN}",
+    "Content-Type": "application/json"
+}
 
-# 📨 Send the GET request
+# === STEP 1: Decrypt the key ===
+
+try:
+    with open(ENCRYPTED_KEY_PATH, "rb") as key_file:
+        encrypted_key = key_file.read()
+
+    private_key = serialization.load_pem_private_key(
+        encrypted_key,
+        password=KEY_PASSWORD,
+        backend=default_backend()
+    )
+
+    with open(DECRYPTED_KEY_PATH, "wb") as decrypted_file:
+        decrypted_file.write(
+            private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+        )
+
+    print("✅ Decryption successful. Using decrypted.key")
+
+except Exception as e:
+    print("❌ Failed to decrypt key:", e)
+    exit(1)
+
+# === STEP 2: Make the API call ===
+
 try:
     response = requests.get(
-        dynatrace_url,
+        URL,
         headers=headers,
         params=params,
-        verify=False  # ❗ Only use False in test environments
+        cert=(CERT_PATH, DECRYPTED_KEY_PATH),
+        verify=False  # ❗ Set to CA bundle in production
     )
-    response.raise_for_status()  # Raise exception for HTTP errors
+    response.raise_for_status()
 
-    # ✅ Parse JSON response
     data = response.json()
 
-    # If 'problems' is in response
+    # Print problems if present
     if "problems" in data:
-        problems = data["problems"]
-        for problem in problems:
+        for problem in data["problems"]:
             print("Problem ID:", problem.get("problemId", "N/A"))
             print("Title:", problem.get("title", "N/A"))
             print("---")
     else:
-        print("No problems found or invalid response format.")
+        print("No problems found.")
 
 except requests.exceptions.RequestException as e:
-    print(f"Request failed: {e}")
+    print("❌ Request failed:", e)
 except json.JSONDecodeError as e:
-    print(f"Failed to parse JSON: {e}")
+    print("❌ Failed to parse JSON:", e)
 except KeyError as e:
-    print(f"Missing key in JSON: {e}")
+    print("❌ Missing key in response:", e)
