@@ -92,3 +92,30 @@ except json.JSONDecodeError as e:
     print("❌ Failed to parse JSON:", e)
 except KeyError as e:
     print("❌ Missing key in response:", e)
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+
+# Read the encrypted private key (.key) file
+with open("client.key", "rb") as key_file:
+    encrypted_key = key_file.read()
+
+# Decrypt using your password
+password = b"optimus"  # Replace with your actual password
+private_key = serialization.load_pem_private_key(
+    encrypted_key,
+    password=password,
+    backend=default_backend()
+)
+
+# Write to a new unencrypted file
+with open("decrypted.key", "wb") as out_file:
+    out_file.write(
+        private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+    )
+
+print("✅ Decrypted key saved to decrypted.key")
