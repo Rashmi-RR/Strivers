@@ -1,0 +1,63 @@
+ import requests
+import json
+import ssl
+import urllib3
+
+# ✅ Suppress InsecureRequestWarning if verify=False is used
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# 🔗 Dynatrace API endpoint URL
+dynatrace_url = "https://api-platform-mtls.cib.echonet/it_prod-dynatrace-configuration/v1/managementZones"
+
+# 🔐 Replace this with your actual access token
+access_token = "YOUR_ACCESS_TOKEN_HERE"
+
+# 📋 Define the headers with access token
+headers = {
+    "Authorization": f"Api-Token {access_token}",
+    "Content-Type": "application/json"
+}
+
+# 🔍 Define the query parameters
+params = {
+    "problemSelector": 'status("OPEN") AND severityLevel("RESOURCE_CONTENTION")',
+    "entitySelector": 'type("HOST")',
+    "from": "now-1d",
+    "to": "now",
+    "pageSize": 10
+}
+
+# 🔒 If you want to use custom SSL (optional for advanced config)
+# context = ssl.create_default_context()
+# context.check_hostname = False
+# context.verify_mode = ssl.CERT_NONE
+
+# 📨 Send the GET request
+try:
+    response = requests.get(
+        dynatrace_url,
+        headers=headers,
+        params=params,
+        verify=False  # ❗ Only use False in test environments
+    )
+    response.raise_for_status()  # Raise exception for HTTP errors
+
+    # ✅ Parse JSON response
+    data = response.json()
+
+    # If 'problems' is in response
+    if "problems" in data:
+        problems = data["problems"]
+        for problem in problems:
+            print("Problem ID:", problem.get("problemId", "N/A"))
+            print("Title:", problem.get("title", "N/A"))
+            print("---")
+    else:
+        print("No problems found or invalid response format.")
+
+except requests.exceptions.RequestException as e:
+    print(f"Request failed: {e}")
+except json.JSONDecodeError as e:
+    print(f"Failed to parse JSON: {e}")
+except KeyError as e:
+    print(f"Missing key in JSON: {e}")
