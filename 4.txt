@@ -87,3 +87,65 @@ try:
 
 except requests.exceptions.RequestException as e:
     print("❌ API Request failed:", e)
+//////))///////////
+
+
+
+
+import requests
+import json
+
+# === Configuration ===
+API_TOKEN = "aabaBvG3LPG5zgGkCSGJFSqfdTRc"  # Replace with your actual token
+CERT_FILE = "D:\\test_uad\\test\\optimus-client-prd-cert.crt"
+KEY_FILE = "D:\\test_uad\\test\\decrypted.key"
+CA_BUNDLE = "D:\\test_uad\\test\\ca_bundle.pem"  # 📌 PEM file from BNPP / IT team
+
+# Dynatrace endpoint
+DYNATRACE_URL = "https://api-platform-mtls.cib.echonet/it_prod-dynatrace-configuration/v1/managementZones"
+
+# Params
+params = {
+    "problemSelector": 'status("OPEN") AND severityLevel("RESOURCE_CONTENTION")',
+    "entitySelector": 'type("HOST")',
+    "from": "now-1d",
+    "to": "now",
+    "pageSize": 10
+}
+
+# Headers
+headers = {
+    "Authorization": f"Api-Token {API_TOKEN}",
+    "Content-Type": "application/json"
+}
+
+# === Make the request ===
+try:
+    print("🌐 Sending HTTPS request to Dynatrace with cert + CA bundle...")
+
+    response = requests.get(
+        DYNATRACE_URL,
+        headers=headers,
+        params=params,
+        cert=(CERT_FILE, KEY_FILE),
+        verify=CA_BUNDLE  # ✅ Secure: verifies server cert using provided CA
+    )
+
+    response.raise_for_status()
+    print("✅ Request successful")
+
+    # === Parse response ===
+    try:
+        data = response.json()
+        if "problems" in data:
+            for problem in data["problems"]:
+                print("\n---")
+                print("🆔 Problem ID:", problem.get("problemId", "N/A"))
+                print("📌 Title:", problem.get("title", "N/A"))
+        else:
+            print("ℹ️ No problems found.")
+    except (json.JSONDecodeError, KeyError) as e:
+        print("❌ JSON parsing error:", e)
+
+except requests.exceptions.RequestException as e:
+    print("❌ Request failed:", e)
