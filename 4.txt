@@ -1,0 +1,89 @@
+import requests
+import json
+import ssl
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+
+# =========================
+# CONFIGURATION
+# =========================
+ENCRYPTED_KEY_PATH = "D:\\test_uad\\test\\optimus-client-prd.key"
+CERT_PATH = "D:\\test_uad\\test\\optimus-client-prd-cert.crt"
+DECRYPTED_KEY_PATH = "D:\\test_uad\\test\\decrypted.key"
+KEY_PASSWORD = b"optimus"  # 🔁 Replace with your actual password
+
+API_TOKEN = "aabaBvG3LPG5zgGkCSGJFSqfdTRc"  # 🔁 Replace with your real token
+
+DYNATRACE_URL = "https://api-platform-mtls.cib.echonet/it_prod-dynatrace-configuration/v1/managementZones"
+
+params = {
+    "problemSelector": 'status("OPEN") AND severityLevel("RESOURCE_CONTENTION")',
+    "entitySelector": 'type("HOST")',
+    "from": "now-1d",
+    "to": "now",
+    "pageSize": 10
+}
+
+headers = {
+    "Authorization": f"Api-Token {API_TOKEN}",
+    "Content-Type": "application/json"
+}
+
+# =========================
+# STEP 1: Decrypt the .key file
+# =========================
+try:
+    print("🔐 Reading encrypted key...")
+    with open(ENCRYPTED_KEY_PATH, "rb") as key_file:
+        encrypted_key = key_file.read()
+
+    print("🔓 Decrypting the key...")
+    private_key = serialization.load_pem_private_key(
+        encrypted_key,
+        password=KEY_PASSWORD,
+        backend=default_backend()
+    )
+
+    with open(DECRYPTED_KEY_PATH, "wb") as out_file:
+        out_file.write(
+            private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+        )
+    print("✅ Decrypted key saved to:", DECRYPTED_KEY_PATH)
+except Exception as e:
+    print("❌ Failed to decrypt key:", e)
+    exit(1)
+
+# =========================
+# STEP 2: Send API request
+# =========================
+try:
+    print("🌐 Sending request to Dynatrace...")
+    response = requests.get(
+        DYNATRACE_URL,
+        headers=headers,
+        params=params,
+        cert=(CERT_PATH, DECRYPTED_KEY_PATH),
+        verify=False  # Set this to CA bundle path if required
+    )
+    response.raise_for_status()
+
+    print("✅ API call successful")
+
+    try:
+        data = response.json()
+        if "problems" in data:
+            for problem in data["problems"]:
+                print("\n---")
+                print("🆔 Problem ID:", problem.get("problemId", "N/A"))
+                print("📌 Title:", problem.get("title", "N/A"))
+        else:
+            print("ℹ️ No problems found in the response.")
+    except (json.JSONDecodeError, KeyError) as e:
+        print("❌ Failed to parse response:", e)
+
+except requests.exceptions.RequestException as e:
+    print("❌ API Request failed:", e)
