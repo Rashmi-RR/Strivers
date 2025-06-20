@@ -1,214 +1,32 @@
 import requests
 import json
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.backends import default_backend
 
-# === CONFIGURATION ===
+API_TOKEN = "aabaBvG3LPG5zgGkCSGJFSqfdTRc"
+CERT_FILE = "D:\\test_uad\\test\\optimus-client-prd-cert.crt"
+KEY_FILE = "D:\\test_uad\\test\\decrypted.key"
+CA_BUNDLE = "D:\\test_uad\\test\\ca_bundle.pem"
 
-# Path to your password-protected key and cert
-ENCRYPTED_KEY_PATH = "client.key"
-CERT_PATH = "client.crt"
-
-# Output path for the decrypted key
-DECRYPTED_KEY_PATH = "decrypted.key"
-
-# Your key password (type exactly as provided)
-KEY_PASSWORD = b"optimus"  # Replace with your actual password (in bytes)
-
-# Dynatrace API token
-API_TOKEN = "your_dynatrace_api_token_here"  # Replace with your token
-
-# Dynatrace API endpoint
-URL = "https://api-platform-mtls.cib.echonet/it_prod-dynatrace-configuration/v1/managementZones"
-
-# Query parameters
-params = {
-    "problemSelector": 'status("OPEN") AND severityLevel("RESOURCE_CONTENTION")',
-    "entitySelector": 'type("HOST")',
-    "from": "now-1d",
-    "to": "now",
-    "pageSize": 10
-}
-
-# Request headers
-headers = {
-    "Authorization": f"Api-Token {API_TOKEN}",
-    "Content-Type": "application/json"
-}
-
-# === STEP 1: Decrypt the key ===
-
-try:
-    with open(ENCRYPTED_KEY_PATH, "rb") as key_file:
-        encrypted_key = key_file.read()
-
-    private_key = serialization.load_pem_private_key(
-        encrypted_key,
-        password=KEY_PASSWORD,
-        backend=default_backend()
-    )
-
-    with open(DECRYPTED_KEY_PATH, "wb") as decrypted_file:
-        decrypted_file.write(
-            private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption()
-            )
-        )
-
-    print("✅ Decryption successful. Using decrypted.key")
-
-except Exception as e:
-    print("❌ Failed to decrypt key:", e)
-    exit(1)
-
-# === STEP 2: Make the API call ===
-
-try:
-    response = requests.get(
-        URL,
-        headers=headers,
-        params=params,
-        cert=(CERT_PATH, DECRYPTED_KEY_PATH),
-        verify=False  # ❗ Set to CA bundle in production
-    )
-    response.raise_for_status()
-
-    data = response.json()
-
-    # Print problems if present
-    if "problems" in data:
-        for problem in data["problems"]:
-            print("Problem ID:", problem.get("problemId", "N/A"))
-            print("Title:", problem.get("title", "N/A"))
-            print("---")
-    else:
-        print("No problems found.")
-
-except requests.exceptions.RequestException as e:
-    print("❌ Request failed:", e)
-except json.JSONDecodeError as e:
-    print("❌ Failed to parse JSON:", e)
-except KeyError as e:
-    print("❌ Missing key in response:", e)
-
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.backends import default_backend
-
-# Read the encrypted private key (.key) file
-with open("client.key", "rb") as key_file:
-    encrypted_key = key_file.read()
-
-# Decrypt using your password
-password = b"optimus"  # Replace with your actual password
-private_key = serialization.load_pem_private_key(
-    encrypted_key,
-    password=password,
-    backend=default_backend()
-)
-
-# Write to a new unencrypted file
-with open("decrypted.key", "wb") as out_file:
-    out_file.write(
-        private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption()
-        )
-    )
-
-print("✅ Decrypted key saved to decrypted.key")
-
-
-
-
-
-.whole code 
-
-import requests
-import json
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.backends import default_backend
-
-# === CONFIGURATION ===
-
-ENCRYPTED_KEY_PATH = "client.key"          # Encrypted key file you already have
-CERT_PATH = "client.crt"                   # Your public certificate file
-DECRYPTED_KEY_PATH = "decrypted.key"       # This will be created by the script
-
-KEY_PASSWORD = b"optimus"                  # 🔁 Replace with your actual password (bytes)
-
-API_TOKEN = "your_dynatrace_token_here"    # 🔁 Replace with your Dynatrace API token
+# Dynatrace endpoint (managementZones endpoint does not use problemSelector)
 DYNATRACE_URL = "https://api-platform-mtls.cib.echonet/it_prod-dynatrace-configuration/v1/managementZones"
 
-params = {
-    "problemSelector": 'status("OPEN") AND severityLevel("RESOURCE_CONTENTION")',
-    "entitySelector": 'type("HOST")',
-    "from": "now-1d",
-    "to": "now",
-    "pageSize": 10
-}
-
 headers = {
     "Authorization": f"Api-Token {API_TOKEN}",
     "Content-Type": "application/json"
 }
 
-# === STEP 1: Decrypt the .key file ===
 try:
-    print("📁 Reading client.key...")
-    with open(ENCRYPTED_KEY_PATH, "rb") as key_file:
-        encrypted_key = key_file.read()
+    print("🌐 Sending request...")
 
-    print("🔐 Decrypting the key...")
-    private_key = serialization.load_pem_private_key(
-        encrypted_key,
-        password=KEY_PASSWORD,
-        backend=default_backend()
-    )
-
-    with open(DECRYPTED_KEY_PATH, "wb") as out_file:
-        out_file.write(
-            private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption()
-            )
-        )
-    print("✅ Decrypted key saved to decrypted.key")
-
-except Exception as e:
-    print("❌ Failed to decrypt key:", e)
-    exit(1)
-
-# === STEP 2: Make the API request ===
-try:
-    print("🌐 Sending request to Dynatrace...")
     response = requests.get(
         DYNATRACE_URL,
         headers=headers,
-        params=params,
-        cert=(CERT_PATH, DECRYPTED_KEY_PATH),
-        verify=False  # ✅ Use a CA bundle path if needed in real use
+        cert=(CERT_FILE, KEY_FILE),
+        verify=CA_BUNDLE
     )
 
     response.raise_for_status()
-
-    print("✅ API call successful")
-
-    # Parse and print response
-    try:
-        data = response.json()
-        if "problems" in data:
-            for problem in data["problems"]:
-                print("\n---")
-                print("🆔 Problem ID:", problem.get("problemId", "N/A"))
-                print("📌 Title:", problem.get("title", "N/A"))
-        else:
-            print("ℹ️ No problems found in the response.")
-    except (json.JSONDecodeError, KeyError) as e:
-        print("❌ Failed to parse response:", e)
+    print("✅ Success!")
+    print(json.dumps(response.json(), indent=2))
 
 except requests.exceptions.RequestException as e:
-    print("❌ API Request failed:", e)
+    print("❌ Request failed:", e)
